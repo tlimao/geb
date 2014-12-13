@@ -2,32 +2,30 @@
 from sys import argv 
 from random import randint
 import os
-
-max_cell_length = 10
-min_cell_length = 5
-
-max_cell_num = 8
-min_cell_num = 4
+import copy
 
 class Geb():
 	
 	def __init__(self):
 		print "Geb Created"
 		
-	def createCells(self, width, height):
+	def createMap(self, width, height, max_cells, min_cells, max_cell_length, min_cell_length):
+		return self.__drawWalls(self.__findCells(self.__createCells(width, height, max_cells, min_cells, max_cell_length, min_cell_length),width,height),width,height)
+		
+	def __createCells(self, width, height, max_cells, min_cells, max_cell_length, min_cell_length):
 		world = [[' ' for i in range(width)] for j in range(height)]
 		
 		# draw map margins
 		for j in range(width):
-			world[0][j] = '#'
-			world[height-1][j] = '#'
+			world[0][j] = '.'
+			world[height-1][j] = '.'
 		
 		for i in range(height):
-			world[i][0] = '#'
-			world[i][width-1] = '#'
+			world[i][0] = '.'
+			world[i][width-1] = '.'
 		
 		# Generate random cells
-		for i in range(randint(min_cell_num, max_cell_num)):
+		for i in range(randint(min_cells, max_cells)):
 			cell_width = randint(min_cell_length, max_cell_length)
 			cell_height = randint(min_cell_length, max_cell_length)
 			
@@ -35,28 +33,26 @@ class Geb():
 			start_cell_j = randint(1, height - cell_height - 1)
 			
 			for j in range(cell_height):
-				world[start_cell_j + j][start_cell_i: start_cell_i + cell_width - 1] = ['*' for n in range(cell_width - 1)]
-			
+				world[start_cell_j + j][start_cell_i: start_cell_i + cell_width - 1] = ['#' for n in range(cell_width - 1)]
+
 		return world
 	
-	def findCells(self, map, width, height):
-		current_cell = 0
+	def __findCells(self, map, width, height):
 		cells = []
 		# Identify all cells
-		for i in range(width):
-			for j in range(height):
-				if map[i][j] == '*':
-					current_cell += 1
-					map[i][j] = current_cell
-					neighbors = self.__findNeighbors(i, j, width, height)
+		for i in range(height):
+			for j in range(width):
+				if map[i][j] == '#':
+					map[i][j] = '*'
+					neighbors = self.__findNeighbors4(i, j, width, height)
 					new_cell = [[i,j]]
 					
 					while len(neighbors) > 0:
 						neighbor = neighbors.pop()
-						if map[neighbor[0]][neighbor[1]] == '*':
+						if map[neighbor[0]][neighbor[1]] == '#':
 							new_cell.append(neighbor)
-							map[neighbor[0]][neighbor[1]] = current_cell
-							new_neighbors = self.__findNeighbors(neighbor[0], neighbor[1], width, height)
+							map[neighbor[0]][neighbor[1]] = '*'
+							new_neighbors = self.__findNeighbors4(neighbor[0], neighbor[1], width, height)
 							for new_neighbor in new_neighbors:
 								if new_neighbor not in neighbors:
 									neighbors.append(new_neighbor)
@@ -79,10 +75,6 @@ class Geb():
 			center[1] = int(center[1])
 
 			cells_centers.append(center)
-
-		# Draw plus simbol in center of cells
-		for center in cells_centers:
-			map[center[0]][center[1]] = '+'
 		
 		# Conect randomically all cells
 		for idx in range(len(cells_centers) - 1):
@@ -100,7 +92,9 @@ class Geb():
 				start_j = max_j
 			
 			for i in range(min_i, max_i+1):
+				map[i][start_j-1] = '*'
 				map[i][start_j] = '*'
+				map[i][start_j+1] = '*'
 				
 			start_i = min_i
 			
@@ -108,30 +102,73 @@ class Geb():
 				start_i = max_i
 			
 			for j in range(min_j, max_j+1):
-				map[start_i][j] = '-'
-				
+				map[start_i-1][j] = '*'
+				map[start_i][j] = '*'
+				map[start_i+1][j] = '*'
+		
 		return map
 		
-	def __findNeighbors(self, i, j, w, h):
+	def __findNeighbors4(self, i, j, w, h):
 		neighbors = []
 		
 		if i - 1 >= 0: neighbors.append([i-1,j])
-		if i + 1 < w: neighbors.append([i+1,j])
+		if i + 1 < h: neighbors.append([i+1,j])
 		if j - 1 >= 0: neighbors.append([i,j-1])
-		if j + 1 < h: neighbors.append([i,j+1])
+		if j + 1 < w: neighbors.append([i,j+1])
 		
 		return neighbors
 		
-geb = Geb()
+	def __findNeighbors8(self, i, j, w, h):
+		neighbors = []
+		
+		if i - 1 >= 0:
+			neighbors.append([i-1,j])
+			
+			if j - 1 >= 0: neighbors.append([i-1,j-1])
+			if j + 1 < w: neighbors.append([i-1,j+1])
+			
+		if i + 1 < h:
+			neighbors.append([i+1,j])
+			
+			if j - 1 >= 0: neighbors.append([i+1,j-1])
+			if j + 1 < w: neighbors.append([i+1,j+1])
+			
+		if j - 1 >= 0: neighbors.append([i,j-1])
+		if j + 1 < w: neighbors.append([i,j+1])
+		
+		return neighbors
+		
+	def __drawWalls(self, map, width, height):
+		walls = []
+		for i in range(height):
+			for j in range(width):
+				if map[i][j] == "*":
+					neighbors = self.__findNeighbors4(i, j, width, height)
+					count = 0
+					for neighbor in neighbors:
+						if map[neighbor[0]][neighbor[1]] == '*':
+							count += 1
+					if count != 4:
+						walls.append([i,j])
+		
+		for wall in walls:
+			map[wall[0]][wall[1]] = '#'
+		
+		return map
+		
+	def printMap(self, map):
+		for row in map:
+			for element in row:
+				print element,
 
-world = geb.findCells(geb.createCells(40, 40), 40, 40)
+			print
+	
+geb = Geb()
 
 os.system('cls')
 
-for row in world:
-	for element in row:
-		print element,
-	
-	print
+mi = geb.createMap(40,1000,80,20,10,6)
+
+geb.printMap(mi)
 
 raw_input()
